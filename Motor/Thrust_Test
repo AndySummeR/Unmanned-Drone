@@ -1,0 +1,108 @@
+#include <PS3BT.h>
+#include <Servo.h>
+
+#include <usbhub.h>
+
+// Satisfy the IDE, which needs to see the include statment in the ino too.
+#ifdef dobogusinclude
+#include <spi4teensy3.h>
+#include <SPI.h>
+#endif
+
+USB Usb;
+BTD Btd(&Usb); // You have to create the Bluetooth Dongle instance like so
+PS3BT PS3(&Btd, 0x00, 0x15, 0x83, 0x3D, 0x0A, 0x57);
+
+const byte MOTOR_IN_USE = 4;
+const byte MOTOR_1 = 0;
+const byte MOTOR_2 = 1;
+const byte MOTOR_3 = 2;
+const byte MOTOR_4 = 3;
+const byte MOTOR_PIN[] = {8, 9, 10, 11};
+
+const long MIN_PWM[] = {1000, 1000, 1000, 1000};
+const long MAX_PWM[] = {2000, 2000, 2000, 2000};
+const long START_POSITION[] = {1200, 1200, 1200, 1200}; 
+
+const unsigned long MOTOR_REFRESH_HZ = 50;
+
+unsigned long currentMicros = 0;
+unsigned long previousServoMicros = 0;
+
+Servo Motor[MOTOR_IN_USE];
+
+
+
+void setup() {
+
+  Serial.begin(115200);
+
+  Serial.print(F("\r\nPS3 Bluetooth Library Started"));
+
+  Serial.setTimeout(500);
+
+  initEscs();
+  // startUpMotors();
+
+}
+
+void loop() {
+        currentMicros = micros();
+        test();
+}
+
+//Initialization ESC
+void initEscs() {
+
+  for(int i = 0; i < MOTOR_IN_USE; i++){
+    Motor[i].attach(MOTOR_PIN[i], MIN_PWM[i], MAX_PWM[i]);   
+    }
+  //Init motors with 0 value
+  writeTo4Escs(0);
+}
+
+void writeTo4Escs(int throttle) {
+
+    for(int i = 0; i < MOTOR_IN_USE; i++){
+    Motor[i].write(throttle);   
+    }
+}
+
+// Ensure the throttle value is between 0 - 180
+int normalizeThrottle(int value) {
+  if (value < 0) {
+    return 0;
+  } else if (value > 180) {
+    return 180;
+  }
+  return value;
+}
+
+//Start the motors
+void startUpMotors() {
+  writeTo4Escs(10);
+}
+
+
+
+void test(){
+
+	Usb.Task();
+
+while (PS3.PS3Connected || PS3.PS3NavigationConnected) {
+	   
+		Serial.print(F("\tRightHatY: "));
+		Serial.print(PS3.getAnalogHat(RightHatY));
+
+		// Read the new throttle value
+		int throttle = map(PS3.getAnalogHat(RightHatY), 0, 255, 180, 0);
+
+		// Print it out
+
+		//Serial.print("Setting throttle to: ");
+		//Serial.println(throttle);
+
+		writeTo4Escs(throttle);
+	}
+
+}
